@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "job_id": "job-recommend-sample",
+  "idempotency_key": "sample-recommend-1",
+  "goal": "Recommend whether the example app should add a versioned job file.",
+  "done_when": "The packet has a one-sentence recommendation.",
+  "seats": ["Ada"],
+  "isolation": "clone",
+  "mode": "recommend",
+  "actions_allowed": [],
+  "actions_forbidden": [
+    "message people",
+    "publish",
+    "spend",
+    "delete",
+    "force-push",
+    "read/write secrets"
+  ],
+  "sources": [
+    {
+      "name": "example-app",
+      "ref": "https://github.com/example/app"
+    }
+  ],
+  "side_effect": "read",
+  "on_awaiting_user": "stop"
+}

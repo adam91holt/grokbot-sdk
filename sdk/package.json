@@ -1,0 +1,55 @@
+{
+  "name": "@adam91holt/grokbot-sdk",
+  "version": "0.1.2",
+  "description": "TypeScript SDK for the live Grok Bot host gateway and sand-data disk stores",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "grokbot": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "extract-manifest": "node --import tsx scripts/extract-host-manifest.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "cli": "node dist/cli.js",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "grok-bot",
+    "sand",
+    "gateway"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adam91holt/grokbot-sdk.git"
+  },
+  "homepage": "https://github.com/adam91holt/grokbot-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/adam91holt/grokbot-sdk/issues"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

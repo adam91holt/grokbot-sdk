@@ -1,0 +1,83 @@
+name: release
+
+# Publishes @adam91holt/grokbot-sdk to npm when a vX.Y.Z tag is pushed.
+#
+# Auth is npm Trusted Publishing (OIDC) — there is no NPM_TOKEN secret.
+# The trusted publisher must be configured once on npmjs.com:
+#   package settings -> Trusted Publisher -> GitHub Actions
+#   repository: adam91holt/grokbot-sdk   workflow: release.yml
+#
+# Do not set NODE_AUTH_TOKEN here; its presence makes npm prefer the token
+# over OIDC and the publish loses its provenance attestation.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # gh release create
+      id-token: write # required for OIDC trusted publishing
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deliberately NO registry-url. Setting it makes setup-node write an
+      # .npmrc containing _authToken=${NODE_AUTH_TOKEN} and export a
+      # placeholder token, so npm authenticates with the literal string
+      # "XXXXX-XXXXX-XXXXX-XXXXX" instead of using OIDC and the publish
+      # fails with a confusing E404. The default registry is npmjs.org.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: sdk/package-lock.json
+
+      # Trusted publishing needs npm >= 11.5.1; do not rely on the version
+      # bundled with the Node release.
+      - name: Upgrade npm
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - run: npm ci
+
+      - name: Verify tag matches package version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match sdk/package.json version $pkg"
+            exit 1
+          fi
+          echo "publishing $pkg"
+
+      - run: npm test
+
+      - run: npm run build
+
+      # prepublishOnly re-runs build + test as a final guard.
+      # Provenance is attached automatically under trusted publishing.
+      - run: npm publish
+
+      # GitHub Release, created only after npm accepts the publish so the two
+      # never disagree about what shipped. Notes are generated from the commits
+      # since the previous tag; the npm tarball is attached as an asset.
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tgz="$(npm pack --silent | tail -1)"
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag \
+            "$tgz"
