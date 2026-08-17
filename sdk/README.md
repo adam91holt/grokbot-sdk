@@ -15,7 +15,14 @@ Disk memory writes match the host fact-line format, but they bypass the host. Pr
 
 `npm test` is dummy-only. Set `GROKBOT_LIVE=1` to add a live gateway smoke (health, host status, roster/MCP/listener counts — no tokens or chat text). CI runs `npm test` in `sdk/` without that env.
 
-The public-facing overview lives in the [root README](../README.md). This file is the deeper API reference.
+The public-facing overview lives in the
+[root README](https://github.com/adam91holt/grokbot-sdk#readme). This file is
+the deeper API reference.
+
+<!-- Links in this file must be absolute. It ships as the npm page, and npm
+     rewrites relative paths against the repo root — `../README.md` became
+     /tree/README.md (a 404) before this was fixed. -->
+
 
 ## Install
 
