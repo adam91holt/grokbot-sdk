@@ -391,8 +391,62 @@ export type SkillCatalogEntry = {
 };
 
 /**
- * FileAutomationStore.toRecord. `trigger` / `runs` stay opaque — trigger is a
- * cron-or-event union (normalizeSpecTrigger) not fully extracted here.
+ * Repeating cron member. Dated crons (`43 18 18 8 *`) still annual-repeat in
+ * the UI — use OnceTrigger for a single fire.
+ */
+export type CronTrigger = {
+  type: "cron";
+  schedule: string;
+};
+
+/**
+ * Single-fire routine trigger. Not gateway/oneshot.ts throwaway runs
+ * (`runOnce` / `discussOnce`).
+ *
+ * `at` is ISO-8601 or epoch milliseconds. SDK parse/create is first-class;
+ * the live host scheduler must accept this shape before it will fire.
+ */
+export type OnceTrigger = {
+  type: "once";
+  at: string | number;
+};
+
+/** Host event listener types from FileAutomationStore / parseStoredTrigger. */
+export type EventTriggerType =
+  | "slack"
+  | "github"
+  | "microsoftTeams"
+  | "linear"
+  | "sentry"
+  | "pagerduty";
+
+/** Event members may carry host-only fields not extracted here. */
+export type EventTrigger = {
+  type: EventTriggerType;
+  [key: string]: unknown;
+};
+
+export type AutomationTriggerMember = CronTrigger | OnceTrigger | EventTrigger;
+
+export type GroupTrigger = {
+  type: "group";
+  listeners: AutomationTriggerMember[];
+};
+
+/**
+ * cron / once / event member, group, or a listener list (host parseStoredTrigger).
+ * Event extras stay allowed; `once` is SDK-first-class until the host scheduler
+ * accepts `{ type: "once", at }`.
+ */
+export type AutomationTrigger =
+  | AutomationTriggerMember
+  | GroupTrigger
+  | AutomationTriggerMember[];
+
+/**
+ * FileAutomationStore.toRecord. `trigger` / `runs` stay mostly opaque — the
+ * host cron-or-event union (normalizeSpecTrigger) is not fully extracted.
+ * SDK-first-class `once` is typed on AutomationSpec / disk parse.
  */
 export type GatewayAutomation = {
   id: string;

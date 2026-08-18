@@ -23,6 +23,9 @@ import {
   turnsFromTranscriptEntries,
   HOST_ACCOUNT_SLOT,
   HOST_MANIFEST,
+  KNOWN_TRIGGER_TYPES,
+  isValidOnceAt,
+  parseStoredTrigger,
   parseConversationOutline,
   parseHostModelSelection,
   parseSseBlock,
@@ -86,4 +89,10 @@ test("package index re-exports caller types and parseSseBlock", () => {
   assert.equal(HOST_ACCOUNT_SLOT, "host");
   assert.equal(typeof HOST_MANIFEST.hostVersion, "string");
   assert.ok(Array.isArray(HOST_MANIFEST.commands));
+  assert.ok(KNOWN_TRIGGER_TYPES.includes("once"));
+  assert.equal(isValidOnceAt("2026-08-18T18:43:00.000Z"), true);
+  assert.deepEqual(parseStoredTrigger({ type: "once", at: "2026-08-18T18:43:00.000Z" }), {
+    type: "once",
+    at: "2026-08-18T18:43:00.000Z",
+  });
 });

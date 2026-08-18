@@ -27,7 +27,8 @@ You do not need Tailscale for this path. You do need the host process running.
 
 ## What to do / not do
 
-- Prefer throwaways (`runOnce`, `discussOnce`, `sendAsAgent`) so live seats stay untouched.
+- Prefer throwaways (`runOnce`, `discussOnce`, `sendAsAgent`) so live seats stay untouched. Those helpers are not a routine trigger.
+- For a single-fire routine, pass `{ type: "once", at: "<ISO-8601 or epoch ms>" }` to `createAgentAutomation` instead of a dated cron. The live host scheduler must accept that shape before it will fire.
 - Do not `broadcastToAgents({ targets: "all" })`.
 - Do not print `gateway.json` or `SAND_GATEWAY_TOKEN`.
 - `sendAsAgent` mints a bus seat that calls the SendToAgent **tool**. It is not a host command.

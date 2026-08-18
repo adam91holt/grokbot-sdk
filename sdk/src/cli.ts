@@ -315,8 +315,24 @@ async function cmdTranscript(
   void bot;
 }
 
+function printAutomationWhen(row: DiskAutomation): string {
+  if (row.schedule != null && row.schedule.length > 0) return row.schedule;
+  const trigger = row.trigger;
+  if (
+    trigger != null &&
+    typeof trigger === "object" &&
+    !Array.isArray(trigger) &&
+    "type" in trigger &&
+    trigger.type === "once" &&
+    "at" in trigger
+  ) {
+    return `once ${String((trigger as { at: unknown }).at)}`;
+  }
+  return trigger != null ? "trigger" : "-";
+}
+
 function printAutomation(row: DiskAutomation, raw: boolean): void {
-  const when = row.schedule ?? (row.trigger != null ? "trigger" : "-");
+  const when = printAutomationWhen(row);
   console.log(
     `${row.enabled ? "on " : "off"}  ${row.agentId}  ${row.id}  ${row.name}  ${when}`,
   );

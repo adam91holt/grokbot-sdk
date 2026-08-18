@@ -1,15 +1,25 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { agentAutomationsDir, agentsDir, isSafeFolderId, isValidSandAgentId } from "../paths.js";
-import type { AutomationProvenance, DiskAutomation } from "../types.js";
+import type {
+  AutomationProvenance,
+  AutomationTrigger,
+  AutomationTriggerMember,
+  DiskAutomation,
+} from "../types.js";
 import { clampLine } from "./memory.js";
 
 export const AUTOMATION_CONFIG_FILENAME = "automation.json";
 export const AUTOMATION_MAX_NAME_LENGTH = 80;
 /** Host SAND_ROUTINE_NOTICES — only id the serializer will persist. */
 export const ROUTINE_NOTICE_IDS = ["github-listener-scope"] as const;
+/**
+ * Host parseStoredTrigger members, plus SDK-first-class `once`.
+ * `once` is a routine trigger (`{ type: "once", at }`), not gateway/oneshot.ts.
+ */
 export const KNOWN_TRIGGER_TYPES = [
   "cron",
+  "once",
   "slack",
   "github",
   "microsoftTeams",
@@ -26,33 +36,51 @@ function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
+/** ISO-8601 or finite epoch milliseconds. */
+export function isValidOnceAt(value: unknown): value is string | number {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return false;
+  return Number.isFinite(Date.parse(trimmed));
+}
+
 function isKnownTriggerMember(value: unknown): boolean {
   if (!isUnknownRecord(value) || typeof value.type !== "string") return false;
   if (value.type === "cron") {
     return typeof value.schedule === "string" && normalizeSchedule(value.schedule).length > 0;
   }
+  if (value.type === "once") {
+    // Dated cron mixed onto a once member is the workaround this type replaces.
+    if (typeof value.schedule === "string" && normalizeSchedule(value.schedule).length > 0) {
+      return false;
+    }
+    return isValidOnceAt(value.at);
+  }
   return (KNOWN_TRIGGER_TYPES as readonly string[]).includes(value.type);
 }
 
 /** Host parseStoredTrigger — accept known member / group / list shapes. */
-export function parseStoredTrigger(value: unknown): unknown | null {
+export function parseStoredTrigger(value: unknown): AutomationTrigger | null {
   if (Array.isArray(value)) {
-    const members = value.filter(isKnownTriggerMember);
+    const members = value.filter(isKnownTriggerMember) as AutomationTriggerMember[];
     if (members.length === 0) return null;
-    if (members.length === 1) return members[0];
+    if (members.length === 1) return members[0] ?? null;
     return { type: "group", listeners: members };
   }
   if (!isUnknownRecord(value)) return null;
   if (value.type === "group") {
-    const listeners = Array.isArray(value.listeners) ? value.listeners.filter(isKnownTriggerMember) : [];
+    const listeners = (
+      Array.isArray(value.listeners) ? value.listeners.filter(isKnownTriggerMember) : []
+    ) as AutomationTriggerMember[];
     if (listeners.length === 0) return null;
-    if (listeners.length === 1) return listeners[0];
+    if (listeners.length === 1) return listeners[0] ?? null;
     return { type: "group", listeners };
   }
-  return isKnownTriggerMember(value) ? value : null;
+  return isKnownTriggerMember(value) ? (value as AutomationTrigger) : null;
 }
 
-function parseStoredConfigTrigger(parsed: Record<string, unknown>): unknown | null {
+function parseStoredConfigTrigger(parsed: Record<string, unknown>): AutomationTrigger | null {
   if (parsed.trigger != null) {
     const trigger = parseStoredTrigger(parsed.trigger);
     if (trigger != null) return trigger;
@@ -98,7 +126,7 @@ function triggerSchedule(trigger: unknown): string | undefined {
 export type ParsedAutomationConfig = {
   name: string;
   prompt: string;
-  trigger: unknown;
+  trigger: AutomationTrigger;
   enabled: boolean;
   provenance: AutomationProvenance;
   createdAt: number;

@@ -18,8 +18,11 @@ import {
   sqliteRoUri,
   formatLegacyTranscriptLine,
   isLegacyTranscriptEnvelope,
+  KNOWN_TRIGGER_TYPES,
+  isValidOnceAt,
   listAgentAutomations,
   listGlobalWorkflows,
+  parseStoredTrigger,
   openAgentStore,
   parseLegacyTranscriptLine,
   parseSandGroup,
@@ -195,6 +198,101 @@ test("parseStoredAutomationConfig matches host serialize keys", () => {
   assert.equal(longName?.name.length, AUTOMATION_MAX_NAME_LENGTH);
 });
 
+test("parseStoredTrigger accepts once at ISO-8601 or epoch ms", () => {
+  assert.ok(KNOWN_TRIGGER_TYPES.includes("once"));
+  assert.equal(isValidOnceAt("2026-08-18T18:43:00.000Z"), true);
+  assert.equal(isValidOnceAt(Date.parse("2026-08-18T18:43:00.000Z")), true);
+  assert.equal(isValidOnceAt(""), false);
+  assert.equal(isValidOnceAt("not-a-date"), false);
+  assert.equal(isValidOnceAt(Number.NaN), false);
+
+  const iso = { type: "once", at: "2026-08-18T18:43:00.000Z" };
+  const epoch = { type: "once", at: Date.parse("2026-08-18T18:43:00.000Z") };
+  assert.deepEqual(parseStoredTrigger(iso), iso);
+  assert.deepEqual(parseStoredTrigger(epoch), epoch);
+  assert.deepEqual(parseStoredTrigger({ type: "once", at: "  2026-08-18T18:43:00+12:00  " }), {
+    type: "once",
+    at: "  2026-08-18T18:43:00+12:00  ",
+  });
+});
+
+test("parseStoredTrigger rejects missing / invalid once and once+cron mix", () => {
+  assert.equal(parseStoredTrigger({ type: "once" }), null);
+  assert.equal(parseStoredTrigger({ type: "once", at: "" }), null);
+  assert.equal(parseStoredTrigger({ type: "once", at: "   " }), null);
+  assert.equal(parseStoredTrigger({ type: "once", at: "not-a-date" }), null);
+  assert.equal(parseStoredTrigger({ type: "once", at: Number.NaN }), null);
+  assert.equal(parseStoredTrigger({ type: "once", at: { iso: "2026-08-18T18:43:00.000Z" } }), null);
+  assert.equal(parseStoredTrigger({ type: "oneshot", at: "2026-08-18T18:43:00.000Z" }), null);
+  assert.equal(
+    parseStoredTrigger({
+      type: "once",
+      at: "2026-08-18T18:43:00.000Z",
+      schedule: "43 18 18 8 *",
+    }),
+    null,
+  );
+  assert.equal(parseStoredTrigger({ type: "cron", at: "2026-08-18T18:43:00.000Z" }), null);
+});
+
+test("parseStoredTrigger keeps once in a group and drops invalid once members", () => {
+  const once = { type: "once", at: "2026-08-18T18:43:00.000Z" };
+  const slack = { type: "slack" };
+  const cron = { type: "cron", schedule: "0 9 * * *" };
+  assert.deepEqual(parseStoredTrigger([once, slack]), {
+    type: "group",
+    listeners: [once, slack],
+  });
+  assert.deepEqual(parseStoredTrigger({ type: "group", listeners: [once, cron] }), {
+    type: "group",
+    listeners: [once, cron],
+  });
+  assert.deepEqual(parseStoredTrigger([{ type: "once" }, cron]), cron);
+  assert.equal(parseStoredTrigger([{ type: "once" }, { type: "oneshot", at: 1 }]), null);
+});
+
+test("parseStoredAutomationConfig reads once trigger and falls back invalid once to schedule", () => {
+  const now = Date.parse("2026-08-18T00:00:00Z");
+  const once = parseStoredAutomationConfig(
+    JSON.stringify({
+      name: "dummy once",
+      prompt: "ping at 18:43",
+      trigger: { type: "once", at: "2026-08-18T18:43:00.000Z" },
+      enabled: true,
+      provenance: "user",
+      createdAt: now,
+    }),
+    now,
+  );
+  assert.ok(once);
+  assert.deepEqual(once?.trigger, { type: "once", at: "2026-08-18T18:43:00.000Z" });
+
+  const fallback = parseStoredAutomationConfig(
+    JSON.stringify({
+      name: "dummy",
+      prompt: "ping",
+      trigger: { type: "once" },
+      schedule: "43 18 18 8 *",
+      createdAt: now,
+    }),
+    now,
+  );
+  assert.deepEqual(fallback?.trigger, { type: "cron", schedule: "43 18 18 8 *" });
+
+  assert.equal(
+    parseStoredAutomationConfig(
+      JSON.stringify({
+        name: "dummy",
+        prompt: "ping",
+        trigger: { type: "once" },
+        createdAt: now,
+      }),
+      now,
+    ),
+    null,
+  );
+});
+
 test("listAgentAutomations skips configs the host would reject", async () => {
   const root = mkdtempSync(join(tmpdir(), "grokbot-automations-"));
   const autoDir = join(root, "agents", DUMMY_AGENT, "automations", "dummy-daily");
@@ -221,6 +319,30 @@ test("listAgentAutomations skips configs the host would reject", async () => {
     assert.equal(listed[0]?.schedule, "0 8 * * *");
     assert.equal(listed[0]?.enabled, true);
     assert.equal("trigger" in (listed[0] ?? {}), false);
+
+    const onceDir = join(root, "agents", DUMMY_AGENT, "automations", "dummy-once");
+    mkdirSync(onceDir, { recursive: true });
+    writeFileSync(
+      join(onceDir, "automation.json"),
+      `${JSON.stringify(
+        {
+          name: "dummy once",
+          prompt: "ping at 18:43",
+          trigger: { type: "once", at: "2026-08-18T18:43:00.000Z" },
+          enabled: true,
+          provenance: "user",
+          createdAt: 1,
+          lastRunAt: null,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const listedOnce = listAgentAutomations(DUMMY_AGENT, root);
+    assert.equal(listedOnce.length, 2);
+    const onceRow = listedOnce.find((row) => row.id === "dummy-once");
+    assert.equal("schedule" in (onceRow ?? {}), false);
+    assert.deepEqual(onceRow?.trigger, { type: "once", at: "2026-08-18T18:43:00.000Z" });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

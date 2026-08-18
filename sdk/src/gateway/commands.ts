@@ -13,6 +13,7 @@ import type {
   AgentSummary,
   AllAutomationRow,
   AsyncTaskRecord,
+  AutomationTrigger,
   BoxMcpServersResult,
   BoxStoreStatus,
   BroadcastResult,
@@ -333,12 +334,15 @@ export type AutomationIdInput = {
 
 /**
  * FileAutomationStore.upsert / update spec.
- * `trigger` is the cron-or-event union (normalizeSpecTrigger) — keep opaque.
+ * `trigger` is the cron / once / event union (normalizeSpecTrigger).
+ * Event members may still carry host-only fields. Prefer `{ type: "once", at }`
+ * over a dated cron for a single fire. The live host scheduler must accept
+ * `once` before it will actually fire.
  */
 export type AutomationSpec = {
   name: string;
   prompt: string;
-  trigger: unknown;
+  trigger: AutomationTrigger;
   isEnabled?: boolean;
 };
 

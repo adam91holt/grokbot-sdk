@@ -156,6 +156,7 @@ export {
   AUTOMATION_MAX_NAME_LENGTH,
   KNOWN_TRIGGER_TYPES,
   ROUTINE_NOTICE_IDS,
+  isValidOnceAt,
   listAgentAutomations,
   listAllDiskAutomations,
   parseStoredAutomationConfig,
