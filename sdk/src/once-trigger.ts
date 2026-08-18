@@ -6,10 +6,17 @@
  * host would drop it (or drop it from a group and keep slack/etc.).
  *
  * createAgentAutomation / updateAgentAutomation translate a standalone once
- * to a dated cron (`M H D M *`, UTC) so something still fires. Dated cron
- * annual-repeats in the UI; there is no host contract to disable/delete after
- * fire. Unrelated to gateway/oneshot.ts throwaway runs.
+ * to a dated cron (`M H D M *`) in the host cron zone so something still fires.
+ * Live host cron is user-local Pacific/Auckland (unless the host process has
+ * CRON_TZ=). This helper emits those clock fields — it does not prefix
+ * `CRON_TZ=` on the schedule; SDK normalizeSchedule only trims, and nothing
+ * extracted from FileAutomationStore says the host keeps that prefix.
+ * Dated cron annual-repeats; there is no disable/delete-after-fire contract.
+ * Unrelated to gateway/oneshot.ts throwaway runs.
  */
+
+/** Live host cron zone when CRON_TZ is unset. */
+export const HOST_CRON_TIME_ZONE = "Pacific/Auckland";
 import { parseStoredTrigger } from "./disk/automations.js";
 import type { AutomationTrigger, CronTrigger, OnceTrigger } from "./types.js";
 
@@ -81,19 +88,61 @@ const ONCE_GROUP_ERROR =
   "once cannot be a group/list member until the host allowlist includes it; " +
   "the host would drop it and keep slack/etc. Translate with onceToDatedCron and pass that cron member.";
 
+function zonedClockFields(
+  ms: number,
+  timeZone: string,
+): { minute: number; hour: number; day: number; month: number } {
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hourCycle: "h23",
+    }).formatToParts(new Date(ms));
+  } catch {
+    throw new Error(`unknown host cron time zone ${timeZone}`);
+  }
+  const read = (type: Intl.DateTimeFormatPartTypes): number => {
+    const raw = parts.find((part) => part.type === type)?.value;
+    const n = raw == null ? Number.NaN : Number(raw);
+    if (!Number.isFinite(n)) {
+      throw new Error(`could not read ${type} in ${timeZone}`);
+    }
+    return n;
+  };
+  return {
+    minute: read("minute"),
+    hour: read("hour"),
+    day: read("day"),
+    month: read("month"),
+  };
+}
+
 /**
- * Live host path for a calendar fire: dated cron in UTC (`M H D M *`).
+ * Live host path for a calendar fire: dated cron (`M H D M *`) in host-local
+ * fields (default Pacific/Auckland). Pass `timeZone` when the host has CRON_TZ=.
  * Minute resolution — seconds are dropped. Annual-repeats; a past `at` still
  * becomes that month/day/time and fires on the next matching calendar date.
  * There is no host contract to disable or delete the routine after it fires.
  */
-export function onceToDatedCron(at: string | number): CronTrigger {
+export function onceToDatedCron(
+  at: string | number,
+  timeZone: string = HOST_CRON_TIME_ZONE,
+): CronTrigger {
   const ms = parseOnceAtMs(at);
   if (ms == null) {
     throw new Error(ONCE_AT_ERROR);
   }
-  const d = new Date(ms);
-  const schedule = `${d.getUTCMinutes()} ${d.getUTCHours()} ${d.getUTCDate()} ${d.getUTCMonth() + 1} *`;
+  const zone = timeZone.trim();
+  if (zone.length === 0) {
+    throw new Error("onceToDatedCron timeZone must be a non-empty IANA name");
+  }
+  const clock = zonedClockFields(ms, zone);
+  const schedule = `${clock.minute} ${clock.hour} ${clock.day} ${clock.month} *`;
   return { type: "cron", schedule };
 }
 

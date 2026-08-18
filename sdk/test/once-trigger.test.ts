@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  HOST_CRON_TIME_ZONE,
   ONCE_AT_MIN_MS,
   isValidOnceAt,
   normalizeOnceAt,
@@ -50,22 +51,31 @@ test("parseOnceTrigger normalizes at and rejects once+cron mix", () => {
   assert.equal(parseOnceTrigger({ type: "cron", schedule: "0 9 * * *" }), null);
 });
 
-test("onceToDatedCron is UTC dated cron at minute resolution", () => {
-  assert.deepEqual(onceToDatedCron(ISO), { type: "cron", schedule: "43 18 18 8 *" });
+test("onceToDatedCron emits Pacific/Auckland clock fields, not UTC", () => {
+  assert.equal(HOST_CRON_TIME_ZONE, "Pacific/Auckland");
+  // 18:43 Auckland (NZST +12) must fire at 18:43 host-local, not 06:43.
   assert.deepEqual(onceToDatedCron("2026-08-18T18:43:00+12:00"), {
+    type: "cron",
+    schedule: "43 18 18 8 *",
+  });
+  // 18:43 UTC is 06:43 the next calendar day in Auckland (NZST +12).
+  assert.deepEqual(onceToDatedCron(ISO), { type: "cron", schedule: "43 6 19 8 *" });
+  // 00:00 UTC 1 Jan is 13:00 Auckland (NZDT +13).
+  assert.deepEqual(onceToDatedCron("2020-01-01T00:00:00.000Z"), {
+    type: "cron",
+    schedule: "0 13 1 1 *",
+  });
+  assert.deepEqual(onceToDatedCron("2026-08-18T18:43:00+12:00", "UTC"), {
     type: "cron",
     schedule: "43 6 18 8 *",
   });
-  assert.deepEqual(onceToDatedCron("2020-01-01T00:00:00.000Z"), {
-    type: "cron",
-    schedule: "0 0 1 1 *",
-  });
   assert.throws(() => onceToDatedCron("2026-08-18"), /ISO-8601/);
   assert.throws(() => onceToDatedCron("   "), /ISO-8601/);
+  assert.throws(() => onceToDatedCron(ISO, "Not/AZone"), /time zone/);
 });
 
 test("toHostAutomationTrigger translates standalone once and refuses group once", () => {
-  assert.deepEqual(toHostAutomationTrigger({ type: "once", at: ISO }), {
+  assert.deepEqual(toHostAutomationTrigger({ type: "once", at: "2026-08-18T18:43:00+12:00" }), {
     type: "cron",
     schedule: "43 18 18 8 *",
   });

@@ -392,7 +392,8 @@ export type SkillCatalogEntry = {
 
 /**
  * Repeating cron member. Dated crons (`43 18 18 8 *`) are the live host path
- * for a calendar fire; they annual-repeat. There is no host `once` type yet.
+ * for a calendar fire (Pacific/Auckland local unless the host has CRON_TZ=);
+ * they annual-repeat. There is no host `once` type yet.
  */
 export type CronTrigger = {
   type: "cron";

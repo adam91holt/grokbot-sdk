@@ -223,16 +223,16 @@ test("createAgentAutomation / updateAgentAutomation translate once to dated cron
   const onceSpec = {
     name: "dummy once",
     prompt: "ping",
-    trigger: { type: "once", at: "2026-08-18T18:43:00.000Z" },
+    trigger: { type: "once" as const, at: "2026-08-18T18:43:00+12:00" },
   };
   await bot.createAgentAutomation({
     id: agentId,
-    spec: onceSpec as (typeof onceSpec & { trigger: { type: "cron"; schedule: string } }),
+    spec: onceSpec,
   });
   await bot.updateAgentAutomation({
     id: agentId,
     automationId: "dummy-auto",
-    spec: onceSpec as (typeof onceSpec & { trigger: { type: "cron"; schedule: string } }),
+    spec: onceSpec,
   });
   const created = seen[0] as { spec?: { trigger?: unknown } };
   const updated = seen[1] as { spec?: { trigger?: unknown } };

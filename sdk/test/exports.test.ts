@@ -91,7 +91,7 @@ test("package index re-exports caller types and parseSseBlock", () => {
   assert.ok(Array.isArray(HOST_MANIFEST.commands));
   assert.equal((KNOWN_TRIGGER_TYPES as readonly string[]).includes("once"), false);
   assert.equal(parseStoredTrigger({ type: "once", at: "2026-08-18T18:43:00.000Z" }), null);
-  assert.deepEqual(onceToDatedCron("2026-08-18T18:43:00.000Z"), {
+  assert.deepEqual(onceToDatedCron("2026-08-18T18:43:00+12:00"), {
     type: "cron",
     schedule: "43 18 18 8 *",
   });
