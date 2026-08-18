@@ -391,8 +391,58 @@ export type SkillCatalogEntry = {
 };
 
 /**
- * FileAutomationStore.toRecord. `trigger` / `runs` stay opaque — trigger is a
- * cron-or-event union (normalizeSpecTrigger) not fully extracted here.
+ * Repeating cron member. Dated crons (`43 18 18 8 *`) are the live host path
+ * for a calendar fire (Pacific/Auckland local unless the host has CRON_TZ=);
+ * they annual-repeat. There is no host `once` type yet.
+ */
+export type CronTrigger = {
+  type: "cron";
+  schedule: string;
+};
+
+/**
+ * SDK convenience only — not a host trigger. `at` is normalized UTC ISO-8601.
+ * create/update translate a standalone once to dated cron. Not gateway/oneshot.ts.
+ */
+export type OnceTrigger = {
+  type: "once";
+  at: string;
+};
+
+/** Host event listener types from FileAutomationStore / parseStoredTrigger. */
+export type EventTriggerType =
+  | "slack"
+  | "github"
+  | "microsoftTeams"
+  | "linear"
+  | "sentry"
+  | "pagerduty";
+
+/** Event members may carry host-only fields not extracted here. */
+export type EventTrigger = {
+  type: EventTriggerType;
+  [key: string]: unknown;
+};
+
+export type AutomationTriggerMember = CronTrigger | EventTrigger;
+
+export type GroupTrigger = {
+  type: "group";
+  listeners: AutomationTriggerMember[];
+};
+
+/**
+ * Host parseStoredTrigger union: cron / event / group / listener list.
+ * `once` is not a member — the live host would drop it.
+ */
+export type AutomationTrigger =
+  | AutomationTriggerMember
+  | GroupTrigger
+  | AutomationTriggerMember[];
+
+/**
+ * FileAutomationStore.toRecord. `trigger` / `runs` stay mostly opaque — the
+ * host cron-or-event union (normalizeSpecTrigger) is not fully extracted.
  */
 export type GatewayAutomation = {
   id: string;

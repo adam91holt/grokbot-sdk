@@ -13,6 +13,8 @@ import type {
   AgentSummary,
   AllAutomationRow,
   AsyncTaskRecord,
+  AutomationTrigger,
+  OnceTrigger,
   BoxMcpServersResult,
   BoxStoreStatus,
   BroadcastResult,
@@ -333,12 +335,16 @@ export type AutomationIdInput = {
 
 /**
  * FileAutomationStore.upsert / update spec.
- * `trigger` is the cron-or-event union (normalizeSpecTrigger) — keep opaque.
+ * `trigger` is the host cron-or-event union (normalizeSpecTrigger).
+ * Event members may still carry host-only fields. Dated cron is the live
+ * path for a calendar fire. A standalone SDK `{ type: "once", at }` is
+ * accepted here and translated to dated cron before POST; do not send
+ * `once` to the host.
  */
 export type AutomationSpec = {
   name: string;
   prompt: string;
-  trigger: unknown;
+  trigger: AutomationTrigger | OnceTrigger;
   isEnabled?: boolean;
 };
 

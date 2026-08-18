@@ -83,6 +83,7 @@ import {
   type WidgetResponseInput,
   type WorkflowIdInput,
 } from "./commands.js";
+import { toHostAutomationSpec } from "../once-trigger.js";
 import {
   composeGatewayAbort,
   isTimeoutAbort,
@@ -592,11 +593,17 @@ export class GrokBot {
   }
 
   async createAgentAutomation(body: CreateAutomationInput): Promise<GatewayAutomation[]> {
-    return await this.command("createAgentAutomation", await this.#agentBody(body));
+    return await this.command(
+      "createAgentAutomation",
+      await this.#agentBody({ ...body, spec: toHostAutomationSpec(body.spec) }),
+    );
   }
 
   async updateAgentAutomation(body: UpdateAutomationInput): Promise<GatewayAutomation[]> {
-    return await this.command("updateAgentAutomation", await this.#agentBody(body));
+    return await this.command(
+      "updateAgentAutomation",
+      await this.#agentBody({ ...body, spec: toHostAutomationSpec(body.spec) }),
+    );
   }
 
   async deleteAgentAutomation(body: AutomationIdInput): Promise<GatewayAutomation[]> {

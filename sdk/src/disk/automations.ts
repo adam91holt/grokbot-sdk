@@ -1,13 +1,23 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { agentAutomationsDir, agentsDir, isSafeFolderId, isValidSandAgentId } from "../paths.js";
-import type { AutomationProvenance, DiskAutomation } from "../types.js";
+import type {
+  AutomationProvenance,
+  AutomationTrigger,
+  AutomationTriggerMember,
+  DiskAutomation,
+} from "../types.js";
 import { clampLine } from "./memory.js";
 
 export const AUTOMATION_CONFIG_FILENAME = "automation.json";
 export const AUTOMATION_MAX_NAME_LENGTH = 80;
 /** Host SAND_ROUTINE_NOTICES — only id the serializer will persist. */
 export const ROUTINE_NOTICE_IDS = ["github-listener-scope"] as const;
+/**
+ * Host parseStoredTrigger allowlist. Do not add `once` until the live host
+ * union includes it — unknown members are dropped (a group [once, slack]
+ * becomes slack).
+ */
 export const KNOWN_TRIGGER_TYPES = [
   "cron",
   "slack",
@@ -35,24 +45,26 @@ function isKnownTriggerMember(value: unknown): boolean {
 }
 
 /** Host parseStoredTrigger — accept known member / group / list shapes. */
-export function parseStoredTrigger(value: unknown): unknown | null {
+export function parseStoredTrigger(value: unknown): AutomationTrigger | null {
   if (Array.isArray(value)) {
-    const members = value.filter(isKnownTriggerMember);
+    const members = value.filter(isKnownTriggerMember) as AutomationTriggerMember[];
     if (members.length === 0) return null;
-    if (members.length === 1) return members[0];
+    if (members.length === 1) return members[0] ?? null;
     return { type: "group", listeners: members };
   }
   if (!isUnknownRecord(value)) return null;
   if (value.type === "group") {
-    const listeners = Array.isArray(value.listeners) ? value.listeners.filter(isKnownTriggerMember) : [];
+    const listeners = (
+      Array.isArray(value.listeners) ? value.listeners.filter(isKnownTriggerMember) : []
+    ) as AutomationTriggerMember[];
     if (listeners.length === 0) return null;
-    if (listeners.length === 1) return listeners[0];
+    if (listeners.length === 1) return listeners[0] ?? null;
     return { type: "group", listeners };
   }
-  return isKnownTriggerMember(value) ? value : null;
+  return isKnownTriggerMember(value) ? (value as AutomationTrigger) : null;
 }
 
-function parseStoredConfigTrigger(parsed: Record<string, unknown>): unknown | null {
+function parseStoredConfigTrigger(parsed: Record<string, unknown>): AutomationTrigger | null {
   if (parsed.trigger != null) {
     const trigger = parseStoredTrigger(parsed.trigger);
     if (trigger != null) return trigger;
@@ -98,7 +110,7 @@ function triggerSchedule(trigger: unknown): string | undefined {
 export type ParsedAutomationConfig = {
   name: string;
   prompt: string;
-  trigger: unknown;
+  trigger: AutomationTrigger;
   enabled: boolean;
   provenance: AutomationProvenance;
   createdAt: number;

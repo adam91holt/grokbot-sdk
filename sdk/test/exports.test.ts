@@ -23,6 +23,9 @@ import {
   turnsFromTranscriptEntries,
   HOST_ACCOUNT_SLOT,
   HOST_MANIFEST,
+  KNOWN_TRIGGER_TYPES,
+  onceToDatedCron,
+  parseStoredTrigger,
   parseConversationOutline,
   parseHostModelSelection,
   parseSseBlock,
@@ -86,4 +89,10 @@ test("package index re-exports caller types and parseSseBlock", () => {
   assert.equal(HOST_ACCOUNT_SLOT, "host");
   assert.equal(typeof HOST_MANIFEST.hostVersion, "string");
   assert.ok(Array.isArray(HOST_MANIFEST.commands));
+  assert.equal((KNOWN_TRIGGER_TYPES as readonly string[]).includes("once"), false);
+  assert.equal(parseStoredTrigger({ type: "once", at: "2026-08-18T18:43:00.000Z" }), null);
+  assert.deepEqual(onceToDatedCron("2026-08-18T18:43:00+12:00"), {
+    type: "cron",
+    schedule: "43 18 18 8 *",
+  });
 });
