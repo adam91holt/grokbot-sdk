@@ -3,19 +3,9 @@
  * FTS may be absent — helpers use ordinary SELECT / LIKE.
  * Message bodies are sensitive; do not log them.
  */
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { openReadonlySqlite, type SqliteDatabase } from "./sqlite.js";
 import { searchIndexPath } from "../paths.js";
 import type { SearchMediaRow, SearchMessageRow } from "../types.js";
-
-function openRo(filePath: string): DatabaseSync {
-  const absolute = resolve(filePath);
-  if (!existsSync(absolute)) {
-    throw new Error(`SQLite database not found: ${absolute}`);
-  }
-  return new DatabaseSync(absolute, { readOnly: true });
-}
 
 export type SearchMessageQuery = {
   agentId?: string;
@@ -35,11 +25,11 @@ export type SearchMediaQuery = {
 
 export class SearchIndex {
   readonly path: string;
-  #db: DatabaseSync;
+  #db: SqliteDatabase;
 
   constructor(sandRoot?: string) {
     this.path = searchIndexPath(sandRoot);
-    this.#db = openRo(this.path);
+    this.#db = openReadonlySqlite(this.path);
   }
 
   getMeta(key: string): string | null {
