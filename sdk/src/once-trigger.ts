@@ -6,12 +6,13 @@
  * host would drop it (or drop it from a group and keep slack/etc.).
  *
  * createAgentAutomation / updateAgentAutomation translate a standalone once
- * to a dated cron (`M H D M *`) in the host cron zone so something still fires.
- * Live host cron is user-local Pacific/Auckland (unless the host process has
- * CRON_TZ=). This helper emits those clock fields — it does not prefix
- * `CRON_TZ=` on the schedule; SDK normalizeSchedule only trims, and nothing
- * extracted from FileAutomationStore says the host keeps that prefix.
- * Dated cron annual-repeats; there is no disable/delete-after-fire contract.
+ * to a dated cron (`M H D M *`) in the host cron zone so something still fires,
+ * and append a prompt footer telling the agent to delete the routine after it
+ * executes. Live host cron is user-local Pacific/Auckland (unless the host
+ * process has CRON_TZ=). This helper emits those clock fields — it does not
+ * prefix `CRON_TZ=` on the schedule; SDK normalizeSchedule only trims, and
+ * nothing extracted from FileAutomationStore says the host keeps that prefix.
+ * Dated cron annual-repeats; the host has no disable-after-fire contract.
  * Unrelated to gateway/oneshot.ts throwaway runs.
  */
 
@@ -22,6 +23,15 @@ import type { AutomationTrigger, CronTrigger, OnceTrigger } from "./types.js";
 
 /** Epoch ms must be strictly after 2001-09-09T01:46:40.000Z. Rejects 0, negatives, seconds. */
 export const ONCE_AT_MIN_MS = 1e12;
+
+/**
+ * Appended to `prompt` only when create/update translate standalone
+ * `{ type: "once", at }` to dated cron. Cron-only and event-listener specs
+ * are left unchanged. The host has no disable-after-fire contract, so the
+ * agent must delete the routine after it executes.
+ */
+export const ONCE_DATED_CRON_DELETE_INSTRUCTION =
+  "This is a one-time dated cron. Delete this routine after it executes; it would otherwise annual-repeat next year.";
 
 function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -127,7 +137,8 @@ function zonedClockFields(
  * fields (default Pacific/Auckland). Pass `timeZone` when the host has CRON_TZ=.
  * Minute resolution — seconds are dropped. Annual-repeats; a past `at` still
  * becomes that month/day/time and fires on the next matching calendar date.
- * There is no host contract to disable or delete the routine after it fires.
+ * There is no host contract to disable or delete the routine after it fires;
+ * `toHostAutomationSpec` appends ONCE_DATED_CRON_DELETE_INSTRUCTION instead.
  */
 export function onceToDatedCron(
   at: string | number,
@@ -188,8 +199,29 @@ export function toHostAutomationTrigger(value: unknown): AutomationTrigger {
   return hostTriggerOrThrow(value);
 }
 
+function appendOnceDatedCronDeleteInstruction(prompt: unknown): string {
+  const base = typeof prompt === "string" ? prompt : "";
+  if (base.includes(ONCE_DATED_CRON_DELETE_INSTRUCTION)) {
+    return base;
+  }
+  return base.length === 0
+    ? ONCE_DATED_CRON_DELETE_INSTRUCTION
+    : `${base}\n\n${ONCE_DATED_CRON_DELETE_INSTRUCTION}`;
+}
+
 export function toHostAutomationSpec<T extends { trigger: unknown }>(
   spec: T,
 ): T & { trigger: AutomationTrigger } {
-  return { ...spec, trigger: toHostAutomationTrigger(spec.trigger) };
+  const translatedOnce = isOnceRecord(spec.trigger);
+  const trigger = toHostAutomationTrigger(spec.trigger);
+  if (!translatedOnce) {
+    return { ...spec, trigger };
+  }
+  return {
+    ...spec,
+    trigger,
+    prompt: appendOnceDatedCronDeleteInstruction(
+      "prompt" in spec ? spec.prompt : undefined,
+    ),
+  };
 }

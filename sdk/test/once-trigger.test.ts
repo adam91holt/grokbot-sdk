@@ -3,11 +3,13 @@ import { test } from "node:test";
 import {
   HOST_CRON_TIME_ZONE,
   ONCE_AT_MIN_MS,
+  ONCE_DATED_CRON_DELETE_INSTRUCTION,
   isValidOnceAt,
   normalizeOnceAt,
   onceToDatedCron,
   parseOnceAtMs,
   parseOnceTrigger,
+  toHostAutomationSpec,
   toHostAutomationTrigger,
 } from "../src/once-trigger.js";
 
@@ -101,4 +103,41 @@ test("toHostAutomationTrigger translates standalone once and refuses group once"
       }),
     /group\/list member/,
   );
+});
+
+test("toHostAutomationSpec appends delete-after-fire footer only on once → dated cron", () => {
+  const once = toHostAutomationSpec({
+    name: "dummy once",
+    prompt: "ping",
+    trigger: { type: "once", at: "2026-08-18T18:43:00+12:00" },
+  });
+  assert.deepEqual(once.trigger, { type: "cron", schedule: "43 18 18 8 *" });
+  assert.equal(once.prompt.startsWith("ping"), true);
+  assert.equal(once.prompt.endsWith(ONCE_DATED_CRON_DELETE_INSTRUCTION), true);
+  assert.equal(once.prompt.includes(ONCE_DATED_CRON_DELETE_INSTRUCTION), true);
+  assert.equal(once.prompt.split(ONCE_DATED_CRON_DELETE_INSTRUCTION).length - 1, 1);
+
+  const already = toHostAutomationSpec({
+    name: "dummy once",
+    prompt: `ping\n\n${ONCE_DATED_CRON_DELETE_INSTRUCTION}`,
+    trigger: { type: "once", at: "2026-08-18T18:43:00+12:00" },
+  });
+  assert.equal(already.prompt, `ping\n\n${ONCE_DATED_CRON_DELETE_INSTRUCTION}`);
+
+  const cron = toHostAutomationSpec({
+    name: "dummy cron",
+    prompt: "ping",
+    trigger: { type: "cron", schedule: "0 9 * * *" },
+  });
+  assert.deepEqual(cron.trigger, { type: "cron", schedule: "0 9 * * *" });
+  assert.equal(cron.prompt, "ping");
+  assert.equal(cron.prompt.includes(ONCE_DATED_CRON_DELETE_INSTRUCTION), false);
+
+  const slack = toHostAutomationSpec({
+    name: "dummy slack",
+    prompt: "ping",
+    trigger: { type: "slack" },
+  });
+  assert.deepEqual(slack.trigger, { type: "slack" });
+  assert.equal(slack.prompt, "ping");
 });
