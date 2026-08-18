@@ -402,7 +402,8 @@ export type CronTrigger = {
 
 /**
  * SDK convenience only — not a host trigger. `at` is normalized UTC ISO-8601.
- * create/update translate a standalone once to dated cron. Not gateway/oneshot.ts.
+ * create/update translate a standalone once to dated cron and append a
+ * delete-after-fire instruction on `prompt`. Not gateway/oneshot.ts.
  */
 export type OnceTrigger = {
   type: "once";

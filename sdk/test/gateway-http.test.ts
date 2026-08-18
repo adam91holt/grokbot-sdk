@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { GrokBot, GrokBotGatewayError, parseSseBlock } from "../src/gateway/client.js";
+import { ONCE_DATED_CRON_DELETE_INSTRUCTION } from "../src/once-trigger.js";
 import {
   GATEWAY_AUTH_SCHEME,
   GATEWAY_REQUEST_ID_HEADER,
@@ -234,10 +235,26 @@ test("createAgentAutomation / updateAgentAutomation translate once to dated cron
     automationId: "dummy-auto",
     spec: onceSpec,
   });
-  const created = seen[0] as { spec?: { trigger?: unknown } };
-  const updated = seen[1] as { spec?: { trigger?: unknown } };
+  const created = seen[0] as { spec?: { trigger?: unknown; prompt?: string } };
+  const updated = seen[1] as { spec?: { trigger?: unknown; prompt?: string } };
   assert.deepEqual(created.spec?.trigger, { type: "cron", schedule: "43 18 18 8 *" });
   assert.deepEqual(updated.spec?.trigger, { type: "cron", schedule: "43 18 18 8 *" });
+  assert.equal(created.spec?.prompt?.startsWith("ping"), true);
+  assert.equal(created.spec?.prompt?.includes(ONCE_DATED_CRON_DELETE_INSTRUCTION), true);
+  assert.equal(updated.spec?.prompt?.includes(ONCE_DATED_CRON_DELETE_INSTRUCTION), true);
+  const cronSpec = {
+    name: "dummy cron",
+    prompt: "ping",
+    trigger: { type: "cron" as const, schedule: "0 9 * * *" },
+  };
+  await bot.createAgentAutomation({ id: agentId, spec: cronSpec });
+  await bot.updateAgentAutomation({ id: agentId, automationId: "dummy-auto", spec: cronSpec });
+  const cronCreated = seen[2] as { spec?: { trigger?: unknown; prompt?: string } };
+  const cronUpdated = seen[3] as { spec?: { trigger?: unknown; prompt?: string } };
+  assert.deepEqual(cronCreated.spec?.trigger, { type: "cron", schedule: "0 9 * * *" });
+  assert.deepEqual(cronUpdated.spec?.trigger, { type: "cron", schedule: "0 9 * * *" });
+  assert.equal(cronCreated.spec?.prompt, "ping");
+  assert.equal(cronUpdated.spec?.prompt, "ping");
   await assert.rejects(
     async () =>
       await bot.createAgentAutomation({

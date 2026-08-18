@@ -164,6 +164,7 @@ export {
 export {
   HOST_CRON_TIME_ZONE,
   ONCE_AT_MIN_MS,
+  ONCE_DATED_CRON_DELETE_INSTRUCTION,
   isValidOnceAt,
   normalizeOnceAt,
   onceToDatedCron,
