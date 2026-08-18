@@ -14,12 +14,12 @@ export const AUTOMATION_MAX_NAME_LENGTH = 80;
 /** Host SAND_ROUTINE_NOTICES — only id the serializer will persist. */
 export const ROUTINE_NOTICE_IDS = ["github-listener-scope"] as const;
 /**
- * Host parseStoredTrigger members, plus SDK-first-class `once`.
- * `once` is a routine trigger (`{ type: "once", at }`), not gateway/oneshot.ts.
+ * Host parseStoredTrigger allowlist. Do not add `once` until the live host
+ * union includes it — unknown members are dropped (a group [once, slack]
+ * becomes slack).
  */
 export const KNOWN_TRIGGER_TYPES = [
   "cron",
-  "once",
   "slack",
   "github",
   "microsoftTeams",
@@ -36,26 +36,10 @@ function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** ISO-8601 or finite epoch milliseconds. */
-export function isValidOnceAt(value: unknown): value is string | number {
-  if (typeof value === "number") return Number.isFinite(value);
-  if (typeof value !== "string") return false;
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return false;
-  return Number.isFinite(Date.parse(trimmed));
-}
-
 function isKnownTriggerMember(value: unknown): boolean {
   if (!isUnknownRecord(value) || typeof value.type !== "string") return false;
   if (value.type === "cron") {
     return typeof value.schedule === "string" && normalizeSchedule(value.schedule).length > 0;
-  }
-  if (value.type === "once") {
-    // Dated cron mixed onto a once member is the workaround this type replaces.
-    if (typeof value.schedule === "string" && normalizeSchedule(value.schedule).length > 0) {
-      return false;
-    }
-    return isValidOnceAt(value.at);
   }
   return (KNOWN_TRIGGER_TYPES as readonly string[]).includes(value.type);
 }

@@ -156,12 +156,21 @@ export {
   AUTOMATION_MAX_NAME_LENGTH,
   KNOWN_TRIGGER_TYPES,
   ROUTINE_NOTICE_IDS,
-  isValidOnceAt,
   listAgentAutomations,
   listAllDiskAutomations,
   parseStoredAutomationConfig,
   parseStoredTrigger,
 } from "./automations.js";
+export {
+  ONCE_AT_MIN_MS,
+  isValidOnceAt,
+  normalizeOnceAt,
+  onceToDatedCron,
+  parseOnceAtMs,
+  parseOnceTrigger,
+  toHostAutomationSpec,
+  toHostAutomationTrigger,
+} from "../once-trigger.js";
 export {
   AgentStore,
   BRANCHED_ENTRY_FILTER_SQL,

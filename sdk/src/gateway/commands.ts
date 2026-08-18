@@ -334,10 +334,10 @@ export type AutomationIdInput = {
 
 /**
  * FileAutomationStore.upsert / update spec.
- * `trigger` is the cron / once / event union (normalizeSpecTrigger).
- * Event members may still carry host-only fields. Prefer `{ type: "once", at }`
- * over a dated cron for a single fire. The live host scheduler must accept
- * `once` before it will actually fire.
+ * `trigger` is the host cron-or-event union (normalizeSpecTrigger).
+ * Event members may still carry host-only fields. Dated cron is the live
+ * path for a calendar fire. A standalone SDK `{ type: "once", at }` is
+ * translated to dated cron before POST; do not send `once` to the host.
  */
 export type AutomationSpec = {
   name: string;

@@ -213,6 +213,45 @@ test("status and import wrappers send host field names", async () => {
   assert.equal(Object.hasOwn(byName.requestDiskSaverAudit as object, "agentId"), false);
 });
 
+test("createAgentAutomation / updateAgentAutomation translate once to dated cron and refuse group once", async () => {
+  const seen: unknown[] = [];
+  const bot = dummyBot(async (_input, init) => {
+    seen.push(JSON.parse(String(init?.body ?? "{}")));
+    return new Response("[]", { status: 200 });
+  });
+  const agentId = "00000000-0000-4000-8000-0000000000aa";
+  const onceSpec = {
+    name: "dummy once",
+    prompt: "ping",
+    trigger: { type: "once", at: "2026-08-18T18:43:00.000Z" },
+  };
+  await bot.createAgentAutomation({
+    id: agentId,
+    spec: onceSpec as (typeof onceSpec & { trigger: { type: "cron"; schedule: string } }),
+  });
+  await bot.updateAgentAutomation({
+    id: agentId,
+    automationId: "dummy-auto",
+    spec: onceSpec as (typeof onceSpec & { trigger: { type: "cron"; schedule: string } }),
+  });
+  const created = seen[0] as { spec?: { trigger?: unknown } };
+  const updated = seen[1] as { spec?: { trigger?: unknown } };
+  assert.deepEqual(created.spec?.trigger, { type: "cron", schedule: "43 18 18 8 *" });
+  assert.deepEqual(updated.spec?.trigger, { type: "cron", schedule: "43 18 18 8 *" });
+  await assert.rejects(
+    async () =>
+      await bot.createAgentAutomation({
+        id: agentId,
+        spec: {
+          name: "dummy",
+          prompt: "ping",
+          trigger: [{ type: "once", at: "2026-08-18T18:43:00.000Z" }, { type: "slack" }],
+        } as never,
+      }),
+    /group\/list member/,
+  );
+});
+
 test("searchMedia request matches host searchMedia(args.query, args.limit)", async () => {
   let body: unknown;
   const bot = dummyBot(async (_input, init) => {

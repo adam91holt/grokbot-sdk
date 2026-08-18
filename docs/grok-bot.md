@@ -28,7 +28,7 @@ You do not need Tailscale for this path. You do need the host process running.
 ## What to do / not do
 
 - Prefer throwaways (`runOnce`, `discussOnce`, `sendAsAgent`) so live seats stay untouched. Those helpers are not a routine trigger.
-- For a single-fire routine, pass `{ type: "once", at: "<ISO-8601 or epoch ms>" }` to `createAgentAutomation` instead of a dated cron. The live host scheduler must accept that shape before it will fire.
+- For a calendar routine, the live host path is a dated cron (`43 18 18 8 *` — annual repeat). `{ type: "once", at }` is not a host trigger; `createAgentAutomation` translates a standalone once to that dated cron. Do not put once in a listener group (the host would drop it). Unrelated to `runOnce`.
 - Do not `broadcastToAgents({ targets: "all" })`.
 - Do not print `gateway.json` or `SAND_GATEWAY_TOKEN`.
 - `sendAsAgent` mints a bus seat that calls the SendToAgent **tool**. It is not a host command.

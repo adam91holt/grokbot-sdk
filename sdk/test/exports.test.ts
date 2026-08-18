@@ -24,7 +24,7 @@ import {
   HOST_ACCOUNT_SLOT,
   HOST_MANIFEST,
   KNOWN_TRIGGER_TYPES,
-  isValidOnceAt,
+  onceToDatedCron,
   parseStoredTrigger,
   parseConversationOutline,
   parseHostModelSelection,
@@ -89,10 +89,10 @@ test("package index re-exports caller types and parseSseBlock", () => {
   assert.equal(HOST_ACCOUNT_SLOT, "host");
   assert.equal(typeof HOST_MANIFEST.hostVersion, "string");
   assert.ok(Array.isArray(HOST_MANIFEST.commands));
-  assert.ok(KNOWN_TRIGGER_TYPES.includes("once"));
-  assert.equal(isValidOnceAt("2026-08-18T18:43:00.000Z"), true);
-  assert.deepEqual(parseStoredTrigger({ type: "once", at: "2026-08-18T18:43:00.000Z" }), {
-    type: "once",
-    at: "2026-08-18T18:43:00.000Z",
+  assert.equal((KNOWN_TRIGGER_TYPES as readonly string[]).includes("once"), false);
+  assert.equal(parseStoredTrigger({ type: "once", at: "2026-08-18T18:43:00.000Z" }), null);
+  assert.deepEqual(onceToDatedCron("2026-08-18T18:43:00.000Z"), {
+    type: "cron",
+    schedule: "43 18 18 8 *",
   });
 });

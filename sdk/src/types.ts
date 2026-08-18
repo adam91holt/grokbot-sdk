@@ -391,8 +391,8 @@ export type SkillCatalogEntry = {
 };
 
 /**
- * Repeating cron member. Dated crons (`43 18 18 8 *`) still annual-repeat in
- * the UI — use OnceTrigger for a single fire.
+ * Repeating cron member. Dated crons (`43 18 18 8 *`) are the live host path
+ * for a calendar fire; they annual-repeat. There is no host `once` type yet.
  */
 export type CronTrigger = {
   type: "cron";
@@ -400,15 +400,12 @@ export type CronTrigger = {
 };
 
 /**
- * Single-fire routine trigger. Not gateway/oneshot.ts throwaway runs
- * (`runOnce` / `discussOnce`).
- *
- * `at` is ISO-8601 or epoch milliseconds. SDK parse/create is first-class;
- * the live host scheduler must accept this shape before it will fire.
+ * SDK convenience only — not a host trigger. `at` is normalized UTC ISO-8601.
+ * create/update translate a standalone once to dated cron. Not gateway/oneshot.ts.
  */
 export type OnceTrigger = {
   type: "once";
-  at: string | number;
+  at: string;
 };
 
 /** Host event listener types from FileAutomationStore / parseStoredTrigger. */
@@ -426,7 +423,7 @@ export type EventTrigger = {
   [key: string]: unknown;
 };
 
-export type AutomationTriggerMember = CronTrigger | OnceTrigger | EventTrigger;
+export type AutomationTriggerMember = CronTrigger | EventTrigger;
 
 export type GroupTrigger = {
   type: "group";
@@ -434,9 +431,8 @@ export type GroupTrigger = {
 };
 
 /**
- * cron / once / event member, group, or a listener list (host parseStoredTrigger).
- * Event extras stay allowed; `once` is SDK-first-class until the host scheduler
- * accepts `{ type: "once", at }`.
+ * Host parseStoredTrigger union: cron / event / group / listener list.
+ * `once` is not a member — the live host would drop it.
  */
 export type AutomationTrigger =
   | AutomationTriggerMember
@@ -446,7 +442,6 @@ export type AutomationTrigger =
 /**
  * FileAutomationStore.toRecord. `trigger` / `runs` stay mostly opaque — the
  * host cron-or-event union (normalizeSpecTrigger) is not fully extracted.
- * SDK-first-class `once` is typed on AutomationSpec / disk parse.
  */
 export type GatewayAutomation = {
   id: string;
