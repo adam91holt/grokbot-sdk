@@ -8,7 +8,7 @@
  */
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { openReadonlySqlite, type SqliteDatabase } from "./sqlite.js";
 import {
   conversationBlobsPath,
   isValidSandAgentId,
@@ -21,17 +21,6 @@ import type { StoreEntry, StoreEntryKind } from "../types.js";
 export function sqliteRoUri(filePath: string): string {
   const absolute = resolve(filePath);
   return `file://${absolute}?mode=ro`;
-}
-
-function openRo(filePath: string): DatabaseSync {
-  const absolute = resolve(filePath);
-  // Never create a missing store / blobs db. Host agent-store-worker opens
-  // with `{ readOnly: true }`; node:sqlite rejects file: URIs (sqliteRoUri
-  // is the documented SQLite form only).
-  if (!existsSync(absolute)) {
-    throw new Error(`SQLite database not found: ${absolute}`);
-  }
-  return new DatabaseSync(absolute, { readOnly: true });
 }
 
 /** Host WINDOW_ENTRY_FILTER_SQL. */
@@ -144,8 +133,8 @@ export class AgentStore {
   readonly agentId: string;
   readonly storePath: string;
   readonly blobsPath: string;
-  #db: DatabaseSync | null;
-  #blobs: DatabaseSync | null = null;
+  #db: SqliteDatabase | null;
+  #blobs: SqliteDatabase | null = null;
 
   constructor(agentId: string, sandRoot?: string) {
     if (!isValidSandAgentId(agentId)) {
@@ -154,7 +143,7 @@ export class AgentStore {
     this.agentId = agentId;
     this.storePath = storeDbPath(agentId, sandRoot);
     this.blobsPath = conversationBlobsPath(agentId, sandRoot);
-    this.#db = openRo(this.storePath);
+    this.#db = openReadonlySqlite(this.storePath);
   }
 
   getKv(key: string): string | null {
@@ -228,7 +217,7 @@ export class AgentStore {
     return row.n;
   }
 
-  #readBlobRow(db: DatabaseSync, id: string): Uint8Array | null {
+  #readBlobRow(db: SqliteDatabase, id: string): Uint8Array | null {
     try {
       const row = db.prepare("SELECT data FROM blobs WHERE id = ?").get(id) as
         | { data: Uint8Array | Buffer }
@@ -246,7 +235,7 @@ export class AgentStore {
    */
   getBlob(id: string): Uint8Array | null {
     if (existsSync(this.blobsPath)) {
-      if (this.#blobs == null) this.#blobs = openRo(this.blobsPath);
+      if (this.#blobs == null) this.#blobs = openReadonlySqlite(this.blobsPath);
       const current = this.#readBlobRow(this.#blobs, id);
       if (current != null) return current;
     }
