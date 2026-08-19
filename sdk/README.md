@@ -121,6 +121,61 @@ grokbot job list
 
 Prints packet metadata + turns (speaker + text) unless `--no-reply`. Never tokens or gateway secrets.
 
+## Cards
+
+`SendMessage` takes a `type` that decides what the user sees. An unknown type,
+or a shape the host rejects, is **discarded without an error** — the model is
+told the call was queued and the user simply sees nothing. These builders emit
+the exact payload the host expects and throw on the constraints it enforces, so
+a mistake surfaces where it was made.
+
+```ts
+import { choice, confirm, cursorAgent, secretRequest } from "@adam91holt/grokbot-sdk";
+
+// Multiple choice. The picked option's `value` comes back as the user's reply,
+// so it replaces asking in prose and parsing the answer.
+choice({
+  prompt: "Enable the remaining tools?",
+  helpText: "CreateAgent lets an agent sign on a new crewmate.",
+  options: [
+    { label: "Enable", value: "Enable all three", style: "primary" },
+    { label: "Leave blocked", style: "danger" },
+  ],
+  allowCustom: true,
+});
+
+choice({ prompt: "Ship it?", options: ["Ship", "Hold"] }); // bare strings are fine
+confirm("Restart the host?");                              // yes/no shorthand
+cursorAgent("bc-…");                                       // Cursor run card
+
+// Ask for a credential through a masked input.
+secretRequest({
+  label: "Slack bot token",
+  connector: "slack",
+  field: "token",
+  description: "Starts with xoxb-",
+});
+```
+
+Constraints, all enforced at build time rather than lost at delivery: `prompt`
+and at least one `label` are required, there is a hard ceiling of
+`MAX_CHOICE_OPTIONS` (6), and `style` is `default` / `primary` / `danger`.
+
+`dismissOnMoveOn` auto-dismisses the card once the user sends a newer message
+without answering — use it only for questions that go moot, never for a decision
+you still need. A dismissal is reported as a decline: treat it as no, and do not
+re-ask.
+
+`secretRequest` is how you ask for a token. The value goes straight to the
+connector's per-agent credential file and never reaches the agent, the
+transcript, or the chat — you only learn that it was provided. There is
+deliberately no parameter for the value itself, so this builder cannot carry a
+secret even by mistake. Never ask for a credential in a normal message: a token
+pasted into chat is stored in the transcript and cannot be un-sent.
+
+A Cursor run does **not** render its card automatically. Send `cursorAgent(bcId)`
+once the launch returns an id, or the user is left with a bare URL.
+
 ## Security
 
 - Gateway token lives in `sand-data/gateway.json` (or `SAND_GATEWAY_TOKEN`). Loaded at runtime, kept in memory.
