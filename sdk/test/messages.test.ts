@@ -11,6 +11,7 @@ import {
   choice,
   confirm,
   cursorAgent,
+  secretRequest,
 } from "../src/messages.js";
 
 const BC_ID = "bc-bc53f4d2-8a37-4ca7-8e2e-4c2ef4e67852";
@@ -92,4 +93,39 @@ test("the exported type list matches what the host renders", () => {
     "cursor-agent",
     "secret-request",
   ]);
+});
+
+test("secretRequest describes the ask and cannot carry the secret", () => {
+  const message = secretRequest({
+    label: "Slack bot token",
+    connector: "slack",
+    field: "token",
+    description: "Starts with xoxb-",
+  });
+  assert.deepEqual(message, {
+    type: "secret-request",
+    secret: {
+      label: "Slack bot token",
+      connector: "slack",
+      field: "token",
+      description: "Starts with xoxb-",
+    },
+  });
+  // The value reaches the connector's credential file directly and never the
+  // transcript, so there is deliberately no field here that could carry one.
+  assert.ok(!("value" in message.secret));
+  assert.ok(!JSON.stringify(message).includes("xoxb-1"));
+});
+
+test("secretRequest omits description rather than sending undefined", () => {
+  const message = secretRequest({ label: "API key", connector: "stripe", field: "key" });
+  assert.deepEqual(Object.keys(message.secret), ["label", "connector", "field"]);
+});
+
+test("secretRequest refuses a missing connector or field", () => {
+  // Without both, the host has nowhere to write the value; the card would be
+  // answered by the user and the credential silently lost.
+  assert.throws(() => secretRequest({ label: "t", connector: "", field: "token" }), TypeError);
+  assert.throws(() => secretRequest({ label: "t", connector: "slack", field: "" }), TypeError);
+  assert.throws(() => secretRequest({ label: "", connector: "slack", field: "token" }), TypeError);
 });

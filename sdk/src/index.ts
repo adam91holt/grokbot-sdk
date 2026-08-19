@@ -89,6 +89,7 @@ export {
   choice,
   confirm,
   cursorAgent,
+  secretRequest,
 } from "./messages.js";
 export type {
   ChoiceInput,
@@ -96,6 +97,8 @@ export type {
   ChoiceOption,
   ChoiceStyle,
   CursorAgentMessage,
+  SecretRequestInput,
+  SecretRequestMessage,
   SendMessageType,
 } from "./messages.js";
 export type {

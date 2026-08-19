@@ -69,6 +69,28 @@ export type ChoiceMessage = {
 
 export type CursorAgentMessage = { type: "cursor-agent"; bcId: string };
 
+export type SecretRequestInput = {
+  /**
+   * What credential to ask for. Shown as the card title and echoed in the
+   * field placeholder ("Paste your …"), e.g. "Slack bot token".
+   */
+  label: string;
+  /**
+   * The connector the secret belongs to. The value is written to that
+   * connector's per-agent credential file.
+   */
+  connector: string;
+  /** The credential field to store the value under, e.g. "token". */
+  field: string;
+  /** Optional short help under the label. */
+  description?: string;
+};
+
+export type SecretRequestMessage = {
+  type: "secret-request";
+  secret: { label: string; connector: string; field: string; description?: string };
+};
+
 /** The host accepts at most this many options on one card. */
 export const MAX_CHOICE_OPTIONS = 6;
 
@@ -165,6 +187,44 @@ export function confirm(
       { label: options.no ?? "No" },
     ],
   });
+}
+
+/**
+ * Ask the user for a credential through a masked secure input.
+ *
+ * The value goes straight to the connector's per-agent credential file: it
+ * never reaches the agent, the transcript, or the chat. You only learn that it
+ * was provided. That is the whole point of this type, and the reason there is
+ * deliberately no parameter here for the secret itself — this builder describes
+ * what to ask for, and cannot carry a value even by mistake.
+ *
+ * Use it instead of asking for a token in a normal message. A secret pasted
+ * into chat is stored in the transcript, is readable by anything that can read
+ * the transcript, and cannot be un-sent.
+ *
+ * ```ts
+ * secretRequest({
+ *   label: "Slack bot token",
+ *   connector: "slack",
+ *   field: "token",
+ *   description: "Starts with xoxb-",
+ * });
+ * ```
+ */
+export function secretRequest(input: SecretRequestInput): SecretRequestMessage {
+  const label = requireText(input?.label, "secretRequest label");
+  const connector = requireText(input?.connector, "secretRequest connector");
+  const field = requireText(input?.field, "secretRequest field");
+  const description = optionalText(input?.description, "secretRequest description");
+  return {
+    type: "secret-request",
+    secret: {
+      label,
+      connector,
+      field,
+      ...(description === undefined ? {} : { description }),
+    },
+  };
 }
 
 /**
