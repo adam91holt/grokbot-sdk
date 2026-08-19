@@ -83,6 +83,21 @@ export {
   assertGatewayCommandAllowed,
   isUnsafeGatewayCommand,
 } from "./gateway/commands.js";
+export {
+  MAX_CHOICE_OPTIONS,
+  SEND_MESSAGE_TYPES,
+  choice,
+  confirm,
+  cursorAgent,
+} from "./messages.js";
+export type {
+  ChoiceInput,
+  ChoiceMessage,
+  ChoiceOption,
+  ChoiceStyle,
+  CursorAgentMessage,
+  SendMessageType,
+} from "./messages.js";
 export type {
   AgentIdBody,
   AgentThreadInput,
