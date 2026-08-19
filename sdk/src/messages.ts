@@ -202,6 +202,11 @@ export function confirm(
  * into chat is stored in the transcript, is readable by anything that can read
  * the transcript, and cannot be un-sent.
  *
+ * On submit the host writes `connector-secrets/<agent-id>/<connector>.json` as
+ * `{ <field>: value }` — so `connector` names the file and `field` names the
+ * key. Get either wrong and the value lands somewhere the connector will not
+ * look for it, with nothing to indicate that happened.
+ *
  * ```ts
  * secretRequest({
  *   label: "Slack bot token",
